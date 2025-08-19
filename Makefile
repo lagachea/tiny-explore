@@ -6,3 +6,8 @@ install:
 
 test:
 	python test.py
+
+fclean:
+	rm -rf .venv
+
+re: fclean install
