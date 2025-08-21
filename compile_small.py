@@ -4,6 +4,32 @@ from tinygrad.nn.state import safe_save
 from tinygrad.device import Device
 from tinygrad.nn.state import safe_load, load_state_dict
 from export_model import export_model
+import torch.nn as nn
+
+class SmallModel(nn.Module):
+    def __init__(self, classes):
+        super(SmallModel, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=(3, 3)),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+            nn.Conv2d(32, 64, kernel_size=(3, 3)),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+        )
+        self.classifier = nn.Sequential(
+            nn.Flatten(1),
+            nn.Dropout(0.5),
+            nn.Linear(64 * 54 * 54, classes)
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.classifier(x)
+        return x
+
+# make a tinygrad implementation to compile
+# class SmallTiny:
 
 if __name__ == "__main__":
     Device.DEFAULT = "WEBGPU"
