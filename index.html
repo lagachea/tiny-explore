@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>small tinygrad WebGPU</title>
+    <script type="module">
+        import smalltiny from "./net.js"
+        window.smalltiny = smalltiny;
+    </script>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #video, #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: auto;
+        }
+
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid #FFF;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #canvas {
+            background: transparent;
+        }
+
+        #fps-meter {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            font-size: 18px;
+            border-radius: 5px;
+            z-index: 10;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 10;
+        }
+
+        .loading-text {
+            font-size: 24px;
+            color: white;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h2>small tinygrad WebGPU</h2>
+    <h2 id="wgpu-error" style="display: none; color: red;">Error: WebGPU is not supported in this browser</h2>
+	<div id="result">result will go here</div>
+    <div class="video-container">
+        <video id="video" muted autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+        <div id="fps-meter"></div>
+
+        <div id="div-loading" class="loading-container">
+            <p class="loading-text">Loading model</p>
+            <span class="loader"></span>
+        </div>
+    </div>
+    <script>
+        let net = null;
+        const modelInputSize = 224;
+        let lastCalledTime;
+        let fps = 0, accumFps = 0, frameCounter = 0;
+
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const offscreenCanvas = document.createElement('canvas');
+        const fpsMeter = document.getElementById('fps-meter');
+        const loadingContainer = document.getElementById('div-loading');
+        const wgpuError = document.getElementById('wgpu-error');
+		const resultText = document.getElementById('result');
+        offscreenCanvas.width = modelInputSize;
+        offscreenCanvas.height = modelInputSize;
+        const offscreenContext = offscreenCanvas.getContext('2d');
+
+
+        if (navigator.mediaDevices?.getUserMedia) {
+            const tryCamera = facing => navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing } } });
+            const handle = stream => {
+                video.srcObject = stream;
+                video.onloadedmetadata = function() {
+                    canvas.width = video.clientWidth;
+                    canvas.height = video.clientHeight;
+                };
+            };
+            tryCamera("environment").then(handle).catch(() => 
+                tryCamera("user").then(handle).catch(e => {
+                    wgpuError.textContent = "Error: Could not access camera."
+                    wgpuError.style.display = "block";
+                    loadingContainer.style.display = "none";
+                })
+            );
+        }
+
+        async function processFrame() {
+            if (video.videoWidth == 0 || video.videoHeight == 0) {
+                requestAnimationFrame(processFrame);
+                return;
+            }
+
+            if (!lastCalledTime) {
+                lastCalledTime = performance.now();
+                fps = 0;
+            } else {
+                const now = performance.now();
+                delta = (now - lastCalledTime)/1000.0;
+                lastCalledTime = now;
+                accumFps += 1/delta;
+
+                if (frameCounter++ >= 10) {
+                    fps = accumFps/frameCounter;
+                    frameCounter = 0;
+                    accumFps = 0;
+                    fpsMeter.innerText = `FPS: ${fps.toFixed(1)}`
+                }
+            }
+
+            const videoAspectRatio = video.videoWidth / video.videoHeight;
+            let targetWidth, targetHeight;
+
+            if (videoAspectRatio > 1) {
+                targetWidth = modelInputSize;
+                targetHeight = modelInputSize / videoAspectRatio;
+            } else {
+                targetHeight = modelInputSize;
+                targetWidth = modelInputSize * videoAspectRatio;
+            }
+
+            const offsetX = (modelInputSize - targetWidth) / 2;
+            const offsetY = (modelInputSize - targetHeight) / 2;
+            offscreenContext.clearRect(0, 0, modelInputSize, modelInputSize);
+            offscreenContext.drawImage(video, offsetX, offsetY, targetWidth, targetHeight);
+            const ouput = await detectObjectsOnFrame(offscreenContext);
+            requestAnimationFrame(processFrame);
+        }
+        requestAnimationFrame(processFrame);
+
+        async function detectObjectsOnFrame(offscreenContext) {
+            if (!net) {
+                let device = await getDevice();
+                if (!device) {
+                    wgpuError.style.display = "block";
+                    loadingContainer.style.display = "none";
+                }
+                net = await smalltiny.load(device, "./net.safetensors");
+                loadingContainer.style.display = "none";
+            }
+            const input = await prepareInput(offscreenContext);
+            const output = await net(new Float32Array(input));
+
+			const arr = Array.from(new Float32Array(output[0]));
+			const index = arr.indexOf(Math.max(...arr));
+			resultText.textContent = small_classes[index];
+
+            return output[0];
+        }
+
+        async function prepareInput(offscreenContext) {
+            return new Promise(resolve => {
+                const imgData = offscreenContext.getImageData(0,0,modelInputSize,modelInputSize);
+                const pixels = imgData.data;
+                const red = [], green = [], blue = [];
+
+                for (let index=0; index<pixels.length; index+=4) {
+                    red.push(pixels[index]/255.0);
+                    green.push(pixels[index+1]/255.0);
+                    blue.push(pixels[index+2]/255.0);
+                }
+                const input = [...red, ...green, ...blue];
+                resolve(input)
+            })
+        }
+
+        const getDevice = async () => {
+            if (!navigator.gpu) return false;
+            const adapter = await navigator.gpu.requestAdapter();
+            return await adapter.requestDevice({
+                powerPreference: "high-performance"
+		    });
+        };
+        
+
+        const small_classes = ["Apple_Black_rot", "Apple_healthy", "Apple_rust", "Apple_scab", "Grape_Black_rot", "Grape_Esca", "Grape_healthy", "Grape_spot"];
+
+        function generateColors(numColors) {
+            const colors = [];
+            for (let i = 0; i < 360; i += 360 / numColors) {
+                colors.push(`hsl(${i}, 100%, 50%)`);
+            }
+            return colors;
+        }
+
+        const classColors = generateColors(small_classes.length);
+    </script>
+</body>
+</html>

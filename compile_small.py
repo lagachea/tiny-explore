@@ -29,6 +29,7 @@ class SmallTiny:
 
 
 if __name__ == "__main__":
+    Device.DEFAULT = "WEBGPU"
     classes = None
     with open("SmallModel-images_dataset-Epch_10-Acc_92.json", "r") as f:
         classes = load(f)
@@ -44,9 +45,8 @@ if __name__ == "__main__":
     # print(f"{loaded=}")
 
     inputs: Tensor = Tensor.randn(1, 3, 224, 224)  # model input likeness
-    Device.DEFAULT = "WEBGPU"
     prg, inp_sizes, out_sizes, state = export_model(
-        model, Device.DEFAULT.lower(), inputs, model_name="SmallTiny"
+        model, Device.DEFAULT.lower(), inputs, model_name="smalltiny"
     )
 
     # save
