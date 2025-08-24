@@ -7,7 +7,7 @@ install:
 compile:
 	python compile_small.py
 
-test:
+convert:
 	python test.py
 
 fclean:
