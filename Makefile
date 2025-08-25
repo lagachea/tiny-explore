@@ -8,7 +8,7 @@ compile:
 	python compile_small.py
 
 convert:
-	python test.py
+	python convert.py
 
 fclean:
 	rm -rf .venv

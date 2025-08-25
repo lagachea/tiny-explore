@@ -66,24 +66,25 @@ if __name__ == "__main__":
     classes = None
 
     with open("models/AlexNet-images_dataset-Epch:10-Acc:96.json", "r") as f:
-        # with open("SmallModel-images_dataset-Epch_10-Acc_92.json", "r") as f:
+    # with open("SmallModel-images_dataset-Epch_10-Acc_92.json", "r") as f:
         classes = load(f)
 
-    # model = SmallTiny(len(classes))
-    model = AlexNet(len(classes))
+    model = SmallTiny(len(classes))
+    # model = AlexNet(len(classes))
     # print(f"{model=}")
 
     model_state = get_state_dict(model)
     # print(f"{model_state=}")
     # for k,v in model_state.items():
-    # print(f"{k=}, {v.shape=}")
-    # print(k)
+        # print(f"{k=}, {v.shape=}")
+        # print(k)
 
     state = safe_load("models/AlexNet-images_dataset-Epch:10-Acc:96.safetensors")
+    # state = safe_load("models/SmallModel-images_dataset-Epch:10-Acc:92.safetensors")
     # print(f"{state=}")
     # for k,v in state.items():
-    # print(f"{k=}, {v.shape=}")
-    # print(k)
+        # print(f"{k=}, {v.shape=}")
+        # print(k)
 
     loaded = load_state_dict(model, state)
     # print(f"{loaded=}")

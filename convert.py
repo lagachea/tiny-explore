@@ -6,6 +6,24 @@ def get_models(dir: str = "models"):
     config: list[Path] = list(Path(dir).rglob("*.json"))
     return {key: value for key,value in zip(config,weights)}
 
+def convert_small():
+    model_paths = [
+        "models/SmallModel-Grape_dataset-Epch:10-Acc:97.safetensors",
+        "models/SmallModel-images_dataset-Epch:10-Acc:92.safetensors",
+    ]
+
+    for path in model_paths:
+        state = safe_load(path)
+
+        match = {
+            "classifier.1.weight": "classifier.2.weight",
+            "classifier.1.bias": "classifier.2.bias",
+        }
+
+        for k, v in match.items():
+            state[k] = state.pop(v)
+        safe_save(state, path)
+
 def convert_alex():
     model_paths = [
         "models/AlexNet-images_dataset-Epch:10-Acc:96.safetensors",
@@ -41,5 +59,6 @@ def convert_alex():
 
 if __name__ == "__main__":
     convert_alex()
+    convert_small()
     # models = get_models()
     # print(f"{models=}")
