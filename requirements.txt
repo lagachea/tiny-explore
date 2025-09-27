@@ -1,3 +1,4 @@
-tinygrad[testing]@git+https://github.com/tinygrad/tinygrad.git
+tinygrad[testing]@git+file:///home/tritri/Documents/tinygrad
+#@tag_rangeify
 numpy
 safetensors

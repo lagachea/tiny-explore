@@ -34,6 +34,7 @@ def convert_alex():
     for path in model_paths:
         state = safe_load(path)
 
+        # how to express bidirectionality ? of 1 to 1
         match = {
             "features.0.weight": "conv1.weight",
             "features.0.bias": "conv1.bias",

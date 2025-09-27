@@ -38,7 +38,7 @@ class AlexNet:
         return x.sequential([*self.features, *self.classifier])
 
 
-class SmallTiny:
+class SmallModel:
     def __init__(self, classes):
         self.features: list[Callable[[Tensor], Tensor]] = [
             nn.Conv2d(3, 32, 3),
@@ -62,40 +62,44 @@ class SmallTiny:
 # match name with class
 
 if __name__ == "__main__":
-    Device.DEFAULT = "WEBGPU"
+    # Device.DEFAULT = "WEBGPU"
     classes = None
+    dirname = Path(__file__).parent / "models"
 
-    with open("models/AlexNet-images_dataset-Epch:10-Acc:96.json", "r") as f:
-    # with open("SmallModel-images_dataset-Epch_10-Acc_92.json", "r") as f:
+    # with open(dirname / "AlexNet.json", "r") as f:
+    with open(dirname / "SmallModel.json", "r") as f:
         classes = load(f)
 
-    model = SmallTiny(len(classes))
     # model = AlexNet(len(classes))
+    model = SmallModel(len(classes))
+    model_name = model.__class__.__name__
     # print(f"{model=}")
 
-    model_state = get_state_dict(model)
+    # model_state = get_state_dict(model)
     # print(f"{model_state=}")
     # for k,v in model_state.items():
-        # print(f"{k=}, {v.shape=}")
-        # print(k)
+    # print(f"{k=}, {v.shape=}")
+    # print(k)
 
-    state = safe_load("models/AlexNet-images_dataset-Epch:10-Acc:96.safetensors")
-    # state = safe_load("models/SmallModel-images_dataset-Epch:10-Acc:92.safetensors")
+    # state = safe_load(dirname / "AlexNet.safetensors")
+    # state = safe_load(dirname / "SmallModel.safetensors")
     # print(f"{state=}")
     # for k,v in state.items():
-        # print(f"{k=}, {v.shape=}")
-        # print(k)
+    # print(f"{k=}, {v.shape=}")
+    # print(k)
 
-    loaded = load_state_dict(model, state)
+    # loaded = load_state_dict(model, state)
     # print(f"{loaded=}")
 
-    inputs: Tensor = Tensor.randn(1, 3, 227, 227)  # model input likeness
+    # inputs: Tensor = Tensor.randn(1, 3, 227, 227)  # model input likeness
+    inputs: Tensor = Tensor.randn(1, 3, 224, 224)  # model input likeness
+    print(model(inputs).tolist())
+
     prg, inp_sizes, out_sizes, state = export_model(
-        model, Device.DEFAULT.lower(), inputs, model_name="alexnet"
+        model, Device.DEFAULT.lower(), inputs, model_name=model_name
     )
 
-    # save
-    dirname = Path(__file__).parent
-    safe_save(state, (dirname / "alexnet.safetensors").as_posix())
-    with open(dirname / f"alex.js", "w") as text_file:
+    # safe_save(state, (dirname / f"{model_name}.safetensors").as_posix())
+
+    with open(dirname / f"{model_name}.js", "w") as text_file:
         text_file.write(prg)
