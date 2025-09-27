@@ -5,6 +5,13 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<title>Camera Capture Demo</title>
+    <script type="module">
+        import smallmodel from "./models/SmallModel.js"
+        window.smalltiny = smallmodel;
+		//       import alexnet from "./models/AlexNet.js"
+		//       window.smalltiny = alexnet;
+		// alex = await alexnet.load(device, "./models/AlexNet.safetensors");
+    </script>
 	<style>
 		:root {
 			color-scheme: light dark;
@@ -166,6 +173,9 @@
 		document.addEventListener('visibilitychange', () => {
 			if (document.hidden) stopCamera();
 		});
+
+
+
 	</script>
 </body>
 

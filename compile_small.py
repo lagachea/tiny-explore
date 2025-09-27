@@ -62,44 +62,48 @@ class SmallModel:
 # match name with class
 
 if __name__ == "__main__":
-    # Device.DEFAULT = "WEBGPU"
-    classes = None
+    Device.DEFAULT = "WEBGPU"
+    classes = [
+        "Apple_Black_rot",
+        "Apple_healthy",
+        "Apple_rust",
+        "Apple_scab",
+        "Grape_Black_rot",
+        "Grape_Esca",
+        "Grape_healthy",
+        "Grape_spot",
+    ]
     dirname = Path(__file__).parent / "models"
 
-    # with open(dirname / "AlexNet.json", "r") as f:
-    with open(dirname / "SmallModel.json", "r") as f:
-        classes = load(f)
+    models = {
+        SmallModel(len(classes)): Tensor.randn(1, 3, 224, 224),
+        AlexNet(len(classes)): Tensor.randn(1, 3, 227, 227),
+    }
+    safetensors = [
+        safe_load(dirname / "SmallModel.safetensors"),
+        safe_load(dirname / "AlexNet.safetensors"),
+    ]
 
-    # model = AlexNet(len(classes))
-    model = SmallModel(len(classes))
-    model_name = model.__class__.__name__
-    # print(f"{model=}")
+    for (model, input), state in zip(models.items(), safetensors):
+        # model_state = get_state_dict(model)
+        # print(f"{model_state=}")
+        # for k,v in model_state.items():
+        # print(f"{k=}, {v.shape=}")
+        # print(k)
 
-    # model_state = get_state_dict(model)
-    # print(f"{model_state=}")
-    # for k,v in model_state.items():
-    # print(f"{k=}, {v.shape=}")
-    # print(k)
+        # print(f"{state=}")
+        # for k,v in state.items():
+        # print(f"{k=}, {v.shape=}")
+        # print(k)
 
-    # state = safe_load(dirname / "AlexNet.safetensors")
-    # state = safe_load(dirname / "SmallModel.safetensors")
-    # print(f"{state=}")
-    # for k,v in state.items():
-    # print(f"{k=}, {v.shape=}")
-    # print(k)
+        load_state_dict(model, state)
+        # print(f"{loaded=}")
+        model_name = model.__class__.__name__
+        prg, inp_sizes, out_sizes, state = export_model(
+            model, Device.DEFAULT.lower(), input, model_name=model_name
+        )
 
-    # loaded = load_state_dict(model, state)
-    # print(f"{loaded=}")
+        # safe_save(state, (dirname / f"{model_name}.safetensors").as_posix())
 
-    # inputs: Tensor = Tensor.randn(1, 3, 227, 227)  # model input likeness
-    inputs: Tensor = Tensor.randn(1, 3, 224, 224)  # model input likeness
-    print(model(inputs).tolist())
-
-    prg, inp_sizes, out_sizes, state = export_model(
-        model, Device.DEFAULT.lower(), inputs, model_name=model_name
-    )
-
-    # safe_save(state, (dirname / f"{model_name}.safetensors").as_posix())
-
-    with open(dirname / f"{model_name}.js", "w") as text_file:
-        text_file.write(prg)
+        with open(dirname / f"{model_name}.js", "w") as text_file:
+            text_file.write(prg)

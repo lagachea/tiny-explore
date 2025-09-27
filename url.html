@@ -50,16 +50,6 @@ canvas {  display: none; }
 		});
 	};
 
-	const timer = async (func, label = "") => {
-		document.getElementById('time').innerHTML = "";
-		const start = performance.now();
-		const out = await func();
-		const delta = (performance.now() - start).toFixed(1)
-		console.log(`${delta} ms ${label}`);
-		document.getElementById('time').innerHTML = `${delta} ms ${label}`;
-		return out;
-	}	
-
 	const getLabels = async () => (await fetch("./net.json")).json();
 
 	const reorderChannelsAndRemoveAlpha = (data) => {
@@ -99,8 +89,7 @@ canvas {  display: none; }
 			resultText.innerHTML = "loading..."
 			labels = await getLabels();
 			const device = await getDevice();
-			const model = (await import("./net.js")).default;
-			net = await timer(() => model.load(device, './net.safetensors'), "(compilation)");
+			net = await smalltiny.load(device, "./models/SmallModel.safetensors");
 			resultText.innerHTML = "ready"
 		} catch (e) {
 			error(e)
@@ -112,12 +101,10 @@ canvas {  display: none; }
 		if (!net) error("Net not loaded yet.");
 
 		const input = reorderChannelsAndRemoveAlpha(Array.from(data).map((pix) => (pix / 255.0) * 0.45 - 0.225));
-		const out = await timer(() => net(new Float32Array(input)));
-
+		const out = net(new Float32Array(input))
 		const arr = Array.from(new Float32Array(out[0]));
 		const index = arr.indexOf(Math.max(...arr));
-
-		resultText.textContent = labels[index];
+		// RESULT labels[index];
 	};
 
 	loadLet();
