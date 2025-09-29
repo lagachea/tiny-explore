@@ -5,13 +5,13 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<title>Camera Capture Demo</title>
-    <script type="module">
-        import smallmodel from "./models/SmallModel.js"
-        window.smalltiny = smallmodel;
+	<script type="module">
+		import smallmodel from "./models/SmallModel.js"
+		window.smalltiny = smallmodel;
 		//       import alexnet from "./models/AlexNet.js"
 		//       window.smalltiny = alexnet;
 		// alex = await alexnet.load(device, "./models/AlexNet.safetensors");
-    </script>
+	</script>
 	<style>
 		:root {
 			color-scheme: light dark;
@@ -66,6 +66,7 @@
 
 <body>
 	<div class="wrap">
+		<div id="result">result will go here</div>
 		<h1>Take a Photo</h1>
 
 		<!-- Live camera preview -->
@@ -83,8 +84,9 @@
 		<!-- Fallback for browsers that block getUserMedia (older iOS Safari, etc.) -->
 		<div id="fallback">
 			<p class="hint">If the camera preview above doesn't work, use this fallback:</p>
-			<input id="filepick" type="file" accept="image/*" capture="environment" />
+			<input id="filepick" type="file" accept="image/*" />
 		</div>
+		<div id="detected">detection will go here</div>
 
 		<!-- Hidden canvas used to grab a frame from the video -->
 		<canvas id="canvas" hidden></canvas>
@@ -98,6 +100,10 @@
 		const canvas = document.getElementById('canvas');
 		const fallback = document.getElementById('fallback');
 		const filepick = document.getElementById('filepick');
+		const resultText = document.getElementById('result');
+		const detected = document.getElementById('detected');
+		let labels, net;
+
 
 		let currentStream; // MediaStream
 		let usingBackCamera = true;
@@ -116,8 +122,9 @@
 				const stream = await navigator.mediaDevices.getUserMedia(constraints);
 				currentStream = stream;
 				video.srcObject = stream;
-				fallback.style.display = 'none';
+				fallback.style.display = 'block';
 			} catch (err) {
+				error("fallback without camera")
 				console.warn('getUserMedia failed, enabling fallback', err);
 				fallback.style.display = 'block';
 			}
@@ -136,13 +143,15 @@
 				const h = video.videoHeight || 720;
 				canvas.width = w;
 				canvas.height = h;
-				const ctx = canvas.getContext('2d');
+
+				const ctx = canvas.getContext("2d", {willReadFrequently: true});
 				ctx.drawImage(video, 0, 0, w, h);
+
 				canvas.toBlob(blob => {
 					if (!blob) return;
 					const url = URL.createObjectURL(blob);
 					photo.src = url;
-				}, 'image/jpeg', 0.92);
+				}, 'image/jpeg', 1);
 			}
 		});
 
@@ -174,7 +183,103 @@
 			if (document.hidden) stopCamera();
 		});
 
+		const error = (err) => {
+			resultText.innerHTML = `Error: ${err}`;
+			throw new Error(err);
+		}
 
+		const getDevice = async () => {
+			if (!navigator.gpu) error("WebGPU not supported.");
+			const adapter = await navigator.gpu.requestAdapter();
+			return await adapter.requestDevice({
+				powerPreference: "high-performance"
+			});
+		};
+
+		const getLabels = async () => (await fetch("./models/SmallModel.json")).json();
+
+		const reorderChannelsAndRemoveAlpha = (data) => {
+			const out = [];
+			let i = 0;
+			for (let c = 0; c < 3; c++) {
+				for (let x = 0; x < 224 * 224; x++) {
+					out[i] = data[x * 4 + c];
+					i++;
+				}
+			}
+			return out;
+		};
+
+		function prepareInput() {
+			const ctx = canvas.getContext("2d", {willReadFrequently: true});
+			const pixels = ctx.getImageData(0, 0, 224, 224).data;
+			const red = [], green = [], blue = [];
+
+			for (let index = 0; index < pixels.length; index += 4) {
+				red.push(pixels[index]);
+				green.push(pixels[index + 1]);
+				blue.push(pixels[index + 2]);
+			}
+			return [...red, ...green, ...blue];
+		}
+
+		const how_to_get_image = async (resource) => {
+			const img = new Image();
+			img.onload = () => {
+				ctx.drawImage(img, 0, 0, 224, 224);
+				const data = ctx.getImageData(0, 0, 224, 224).data;
+				runNet(data)
+			};
+			img.src = resource;
+		}
+
+		const loadLet = async () => {
+			try {
+				resultText.innerHTML = "loading..."
+				labels = await getLabels();
+				const device = await getDevice();
+				net = await smalltiny.load(device, "./models/SmallModel.safetensors");
+				resultText.innerHTML = "ready"
+			} catch (e) {
+				error(e)
+			}
+		}
+
+		function softmax(arr) {
+			const maxVal = Math.max(...arr);       // prevent overflow
+			const exps = arr.map(v => Math.exp(v - maxVal));
+			const sum = exps.reduce((a, b) => a + b, 0);
+
+			// Handle edge case: sum ~ 0
+			if (sum === 0 || !isFinite(sum)) {
+				window.alert("uniform")
+				// fallback: uniform distribution
+				return Array(arr.length).fill(1 / arr.length);
+			}
+
+			return exps.map(e => e / sum);
+		}
+
+
+		const runNet = async () => {
+			if (!net) error("Net not loaded yet.");
+
+			const input = prepareInput()
+			const out = await net(new Float32Array(input))
+			// need softmax from number to percent
+			outmax = softmax(out[0])
+			window.alert(outmax)
+			// then index of max for labels index
+			const index = outmax.indexOf(Math.max(...outmax));
+			window.alert(labels[index])
+			detected.innerHTML = labels[index];
+		};
+
+		photo.addEventListener("load", () => {
+			runNet()
+		});
+
+		loadLet();
 
 	</script>
 </body>
